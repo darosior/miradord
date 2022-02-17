@@ -70,13 +70,13 @@ dependencies = [
 
 [[package]]
 name = "revault_tx"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a3e08e97cd866f7f1e4a11ca71604f422d7d6d77ec923fd1c140fb19827e381"
+version = "0.4.1"
+source = "git+https://github.com/darosior/revault_tx?branch=feebumping_riddance#8a61ee2f8c7cf1e5fbb6d93695645641d1e13460"
 dependencies = [
  "base64",
  "bitcoinconsensus",
  "miniscript",
+ "serde",
 ]
 
 [[package]]
