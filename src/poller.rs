@@ -12,7 +12,7 @@ use crate::{
     plugins::{NewBlockInfo, VaultInfo},
 };
 use revault_tx::{
-    bitcoin::{consensus::encode, secp256k1, Amount, OutPoint},
+    bitcoin::{consensus::encode, secp256k1, Amount, OutPoint, Transaction as BitcoinTransaction},
     scripts::{DerivedCpfpDescriptor, DerivedDepositDescriptor, DerivedUnvaultDescriptor},
     transactions::{
         CancelTransaction, RevaultPresignedTransaction, RevaultTransaction, UnvaultTransaction,
@@ -365,6 +365,7 @@ fn check_for_unvault(
 ) -> Result<Vec<VaultInfo>, PollerError> {
     let deleg_vaults = db_blank_vaults(db_path)?;
     let mut new_attempts = vec![];
+    let mut spend_cache = HashMap::<OutPoint, BitcoinTransaction>::new();
 
     for mut db_vault in deleg_vaults {
         let (deposit_desc, unvault_desc, cpfp_desc) = descriptors(secp, config, &db_vault);
@@ -399,12 +400,21 @@ fn check_for_unvault(
             db_updates.new_unvaulted.insert(db_vault.id, db_vault);
 
             let candidate_tx = if let Some(client) = coordinator_client {
-                match client.get_spend_transaction(db_vault.deposit_outpoint.clone()) {
-                    Ok(res) => res,
-                    Err(_e) => {
-                        // Because we do not trust the coordinator, we consider it refuses to deliver the
-                        // spend tx if a communication error happened.
-                        None
+                if let Some(tx) = spend_cache.get(&db_vault.deposit_outpoint) {
+                    Some(tx.clone())
+                } else {
+                    match client.get_spend_transaction(db_vault.deposit_outpoint.clone()) {
+                        Ok(tx) => {
+                            if let Some(ref tx) = tx {
+                                spend_cache.insert(db_vault.deposit_outpoint, tx.clone());
+                            }
+                            tx
+                        },
+                        Err(_e) => {
+                            // Because we do not trust the coordinator, we consider it refuses to deliver the
+                            // spend tx if a communication error happened.
+                            None
+                        }
                     }
                 }
             } else {
